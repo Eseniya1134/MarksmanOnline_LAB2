@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane id="gameOverRoot" stylesheets="@marksman.css" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/17.0.12" fx:controller="com.marksman.controller.GameOverController">
+    <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0" spacing="40">
+        <children>
+
+            <ImageView fx:id="img" fitHeight="220" fitWidth="220" preserveRatio="true" />
+
+            <VBox id="gameOverBox" alignment="CENTER" spacing="32">
+                <Label id="resultLabel" fx:id="resultLabel" text="" />
+                <Label id="scoreLabel" fx:id="scoreLabel" text="" />
+                <Button id="startBtn" onAction="#onRestartClick" styleClass="btn-pixel" text="▶  НАЧАТЬ СНАЧАЛА" />
+                <Button onAction="#onMenuClick" styleClass="btn-pixel" text="⌂  В МЕНЮ" />
+            </VBox>
+
+        </children>
+    </HBox>
+</StackPane>

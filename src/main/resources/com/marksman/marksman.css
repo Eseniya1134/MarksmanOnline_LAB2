@@ -1,0 +1,185 @@
+/* === MARKSMAN — PIXEL DARK FANTASY THEME === */
+
+/* Google Fonts pixel font via web — если нет интернета, fallback на monospace */
+@font-face {
+    src: url('https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2') format('woff2');
+    font-family: 'Press Start 2P';
+}
+
+/*  ROOT */
+.root {
+    -fx-background-color: #1a1020;
+    -fx-font-family: 'Press Start 2P', monospace;
+}
+
+/*  SIDEBAR PANEL*/
+#sidePanel {
+    -fx-background-color: #1a1020;
+    -fx-border-color: #6b3fa0 #3d2260 #3d2260 #6b3fa0;
+    -fx-border-width: 3;
+    -fx-padding: 24 16 24 16;
+    -fx-spacing: 10;
+    -fx-min-width: 240;
+    -fx-pref-width: 240;
+}
+
+/*SECTION BLOCK  */
+.stat-block {
+    -fx-background-color: #2a1840;
+    -fx-border-color: #4a2a7a;
+    -fx-border-width: 2;
+    -fx-padding: 10 12 10 12;
+    -fx-spacing: 4;
+}
+
+/* LABELS: CATEGORY HEADER */
+.label-header {
+    -fx-font-family: 'Press Start 2P', monospace;
+    -fx-font-size: 10px;
+    -fx-text-fill: #a078d0;
+    -fx-wrap-text: true;
+}
+
+/* LABELS: VALUE */
+.label-value {
+    -fx-font-family: 'Press Start 2P', monospace;
+    -fx-font-size: 20px;
+    -fx-text-fill: #f0c040;
+    -fx-effect: dropshadow(one-pass-box, #c89000, 0, 0, 2, 2);
+}
+
+/*  DIVIDER */
+.pixel-divider {
+    -fx-border-color: transparent transparent #4a2a7a transparent;
+    -fx-border-width: 0 0 2 0;
+    -fx-padding: 0 0 6 0;
+}
+
+/* BUTTONS  */
+.btn-pixel {
+    -fx-font-family: 'Press Start 2P', monospace;
+    -fx-font-size: 10px;
+    -fx-text-fill: #f0e8ff;
+    -fx-background-color: #3d1f6e;
+    -fx-border-color: #a060e0 #3d1f6e #3d1f6e #a060e0;
+    -fx-border-width: 3;
+    -fx-padding: 12 10 10 10;
+    -fx-cursor: hand;
+    -fx-pref-width: 200;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+}
+
+.btn-pixel:hover {
+    -fx-background-color: #5530a0;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #c090ff #5530a0 #5530a0 #c090ff;
+}
+
+.btn-pixel:pressed {
+    -fx-background-color: #2a1048;
+    -fx-border-color: #3d1f6e #a060e0 #a060e0 #3d1f6e;
+    -fx-translate-y: 2;
+}
+
+/* START button — золотой акцент */
+#startBtn {
+    -fx-background-color: #7a4800;
+    -fx-border-color: #f0a020 #7a4800 #7a4800 #f0a020;
+    -fx-text-fill: #fff0c0;
+}
+
+#startBtn:hover {
+    -fx-background-color: #a06010;
+    -fx-border-color: #ffd060 #a06010 #a06010 #ffd060;
+}
+
+#startBtn:pressed {
+    -fx-background-color: #4a2800;
+    -fx-border-color: #7a4800 #f0a020 #f0a020 #7a4800;
+    -fx-translate-y: 2;
+}
+
+/* SHOT button — красный акцент */
+#shotBtn {
+    -fx-background-color: #6e1f20;
+    -fx-border-color: #e04040 #6e1f20 #6e1f20 #e04040;
+    -fx-text-fill: #ffd0d0;
+}
+
+#shotBtn:hover {
+    -fx-background-color: #8e2f30;
+    -fx-border-color: #ff6060 #8e2f30 #8e2f30 #ff6060;
+}
+
+#shotBtn:pressed {
+    -fx-background-color: #3e0f10;
+    -fx-border-color: #6e1f20 #e04040 #e04040 #6e1f20;
+    -fx-translate-y: 2;
+}
+
+/* RECORD label */
+#recordValue {
+    -fx-text-fill: #60e0a0;
+}
+
+/* TIME label */
+#timeValue {
+    -fx-text-fill: #60c0ff;
+}
+
+/*  MENU SCREEN  */
+#menuRoot {
+    -fx-background-color: #1a1020;
+}
+
+#menuBox {
+    -fx-padding: 60 40 60 40;
+}
+
+/* GAME OVER SCREEN  */
+#gameOverRoot {
+    -fx-background-color: #1a1020;
+}
+
+#gameOverBox {
+    -fx-padding: 60 40 60 40;
+}
+
+#resultWin {
+    -fx-font-family: 'Press Start 2P', monospace;
+    -fx-font-size: 28px;
+    -fx-text-fill: #f0c040;
+    -fx-effect: dropshadow(one-pass-box, #c89000, 0, 0, 4, 4);
+}
+
+#resultLose {
+    -fx-font-family: 'Press Start 2P', monospace;
+    -fx-font-size: 28px;
+    -fx-text-fill: #e04040;
+    -fx-effect: dropshadow(one-pass-box, #800000, 0, 0, 4, 4);
+}
+
+#scoreLabel {
+    -fx-font-family: 'Press Start 2P', monospace;
+    -fx-font-size: 14px;
+    -fx-text-fill: #a078d0;
+}
+
+/* Кнопка "Продолжить" — бирюзовый акцент */
+#continueBtn {
+    -fx-background-color: #0a4a40;
+    -fx-border-color: #20c080 #0a4a40 #0a4a40 #20c080;
+    -fx-text-fill: #80ffd0;
+}
+
+#continueBtn:hover {
+    -fx-background-color: #106050;
+    -fx-border-color: #40e090 #106050 #106050 #40e090;
+}
+
+#continueBtn:pressed {
+    -fx-background-color: #052820;
+    -fx-border-color: #0a4a40 #20c080 #20c080 #0a4a40;
+    -fx-translate-y: 2;
+}
