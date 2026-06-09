@@ -9,8 +9,8 @@ import java.util.function.Consumer;
 /**
  * Клиентский сокет: подключение к серверу, отправка команд, приём сообщений.
  *
- * Все входящие сообщения доставляются через callback в JavaFX Application Thread
- * (Platform.runLater), чтобы UI-контроллер мог обновлять интерфейс напрямую.
+ * ЛР3: добавлен метод sendLeaderboardRequest() — запрос таблицы лидеров
+ * через то же соединение (ТЗ: «Отдельное подключение создавать не нужно!»).
  */
 public class ServerConnection {
 
@@ -24,23 +24,13 @@ public class ServerConnection {
         this.onMessage = onMessage;
     }
 
-    /**
-     * Подключается к серверу и отправляет имя пользователя.
-     *
-     * @param host     IP или hostname сервера
-     * @param port     порт (по умолчанию 8080)
-     * @param username имя игрока
-     * @throws IOException если подключиться не удалось
-     */
     public void connect(String host, int port, String username) throws IOException {
         socket = new Socket(host, port);
         out    = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
         connected = true;
 
-        // Первым делом отправляем JOIN с именем
         send(GameProtocol.encode(GameProtocol.JOIN, username));
 
-        // Фоновый поток чтения
         Thread reader = new Thread(() -> {
             try (var in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
                 String line;
@@ -58,11 +48,11 @@ public class ServerConnection {
         reader.start();
     }
 
-    // ── Команды к серверу ─────────────────────────────────────────────────────
-
-    public void sendReady()  { send(GameProtocol.READY); }
-    public void sendPause()  { send(GameProtocol.PAUSE); }
-    public void sendShoot()  { send(GameProtocol.SHOOT); }
+    public void sendReady()             { send(GameProtocol.READY); }
+    public void sendPause()             { send(GameProtocol.PAUSE); }
+    public void sendShoot()             { send(GameProtocol.SHOOT); }
+    /** pапросить таблицу лидеров через то же соединение. */
+    public void sendLeaderboardRequest(){ send(GameProtocol.LEADERBOARD_REQUEST); }
 
     public void send(String message) {
         if (out != null && connected) {

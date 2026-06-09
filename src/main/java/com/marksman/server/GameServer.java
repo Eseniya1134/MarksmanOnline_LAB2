@@ -1,5 +1,7 @@
 package com.marksman.server;
 
+import com.marksman.db.PlayerDao;
+import com.marksman.db.PlayerRecord;
 import com.marksman.entity.Arrow;
 import com.marksman.entity.Target;
 import com.marksman.network.GameProtocol;
@@ -13,15 +15,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * Сервер игры «Меткий стрелок».
  *
- * Запуск: GameServer.main() или new GameServer().start()
- *
- * Сервер:
- *  – принимает до 4 игроков
- *  – проверяет уникальность имён
- *  – контролирует движение мишеней
- *  – проверяет попадания при выстреле
- *  – рассылает STATE каждые 50 мс
- *  – завершает игру при наборе первым игроком 6 очков
+ * ЛР3 изменения:
+ * - Хранение имён и побед в БД через Hibernate (PlayerDao)
+ * - Обработка LEADERBOARD_REQUEST от клиента
+ * - Увеличение wins победителя в БД после каждой игры
+ * - broadcastPlayerList() теперь передаёт поле wins
  */
 public class GameServer {
 
@@ -29,16 +27,17 @@ public class GameServer {
     public static final int MAX_PLAYERS = 4;
     public static final int WIN_SCORE   = 6;
 
-    // Параметры мишеней
-    private static final int NEAR_X  = 500;
-    private static final int FAR_X   = 700;
-    private static final int NEAR_SIZE = 120;
-    private static final int FAR_SIZE  = 60;
+    private static final int NEAR_X     = 500;
+    private static final int FAR_X      = 700;
+    private static final int NEAR_SIZE  = 120;
+    private static final int FAR_SIZE   = 60;
     private static final int NEAR_SPEED = 2;
     private static final int FAR_SPEED  = 4;
 
-    // Высота игрового поля
-    private static final int FIELD_HEIGHT = 500;
+    private static final int FIELD_HEIGHT    = 500;
+    private static final int PLAYER_Y_BASE   = 60;
+    private static final int PLAYER_Y_STEP   = 110;
+    private static final int PLAYER_SPRITE_H = 100;
 
     private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
     private volatile boolean gameRunning = false;
@@ -47,11 +46,11 @@ public class GameServer {
     private Target nearTarget;
     private Target farTarget;
 
-    private Thread stateThread; // поток рассылки STATE
+    private Thread stateThread;
 
-    // ── Точка входа ───────────────────────────────────────────────────────────
+    private final PlayerDao playerDao = PlayerDao.getInstance();
 
-    public static void main(String[] args) {
+  public static void main(String[] args) {
         new GameServer().start();
     }
 
@@ -62,7 +61,6 @@ public class GameServer {
                 Socket socket = serverSocket.accept();
 
                 if (clients.size() >= MAX_PLAYERS) {
-                    // Отказ: слот занят
                     try (var w = new PrintWriter(socket.getOutputStream(), true)) {
                         w.println(GameProtocol.encode(GameProtocol.JOIN_FAIL, "Сервер заполнен"));
                     }
@@ -70,11 +68,9 @@ public class GameServer {
                     continue;
                 }
 
-                // Считать имя игрока (первое сообщение JOIN:<name>)
                 String username = readUsername(socket);
                 if (username == null) { socket.close(); continue; }
 
-                // Проверить уникальность имени
                 boolean taken = clients.stream()
                         .anyMatch(c -> c.getUsername().equalsIgnoreCase(username));
                 if (taken) {
@@ -85,18 +81,21 @@ public class GameServer {
                     continue;
                 }
 
-                ClientHandler handler = new ClientHandler(socket, this, username);
+                // убедиться, что запись в БД существует (создать если нет)
+                playerDao.getOrCreate(username);
+
+                ClientHandler handler = new ClientHandler(socket, this, username, clients.size());
                 clients.add(handler);
                 handler.start();
                 System.out.println("[Server] Подключился: " + username
                         + " (всего игроков: " + clients.size() + ")");
+                broadcastPlayerList();
             }
         } catch (IOException e) {
             System.err.println("[Server] Ошибка: " + e.getMessage());
         }
     }
 
-    /** Читает первое сообщение JOIN:<name> из сокета до создания ClientHandler. */
     private String readUsername(Socket socket) {
         try {
             var in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -110,18 +109,14 @@ public class GameServer {
         }
     }
 
-    // ── Обработчики событий от ClientHandler ─────────────────────────────────
-
-    /** Игрок нажал «Готов». Если все готовы и игроков ≥ 2 — старт. */
     public synchronized void onPlayerReady(ClientHandler handler) {
         handler.setReady(true);
         System.out.println("[Server] Готов: " + handler.getUsername());
 
         if (gamePaused) {
-            // Пауза снимается, когда все снова нажимают «Готов»
             boolean allReady = clients.stream().allMatch(ClientHandler::isReady);
             if (allReady) {
-                gamePaused = false;
+                gamePaused  = false;
                 gameRunning = true;
                 nearTarget.setSpeed(NEAR_SPEED);
                 farTarget.setSpeed(FAR_SPEED);
@@ -137,39 +132,30 @@ public class GameServer {
         }
     }
 
-    /** Игрок запросил паузу. */
     public synchronized void onPlayerPause(ClientHandler handler) {
         if (!gameRunning) return;
         handler.setReady(false);
         gamePaused  = true;
         gameRunning = false;
-        // Останавливаем мишени (speed=0, поток продолжит работу, но без движения)
         nearTarget.setSpeed(0);
         farTarget.setSpeed(0);
         broadcast(GameProtocol.PAUSE);
         System.out.println("[Server] Пауза по запросу: " + handler.getUsername());
     }
 
-    /** Игрок выстрелил. */
     public synchronized void onShoot(ClientHandler shooter) {
         if (!gameRunning) return;
 
         shooter.addShot();
 
-        // Вычисляем Y стрелы: у каждого игрока своя высота прицела
-        int arrowY = getArrowY(shooter.getPlayerId());
+        int arrowY = getArrowY(shooter.getPlayerIndex());
 
-        // Создаём стрелу для рассылки (x=100 — позиция лучника, летит вправо)
-        Arrow arrow = new Arrow(shooter.getUsername(), 100, arrowY, 10, 15);
-
-        // Сообщить всем о выстреле
         broadcast(GameProtocol.encode(
                 GameProtocol.SHOT_EVENT,
                 shooter.getUsername(),
                 String.valueOf(arrowY)
         ));
 
-        // Проверяем попадание по текущим позициям мишеней
         int points = 0;
         if (nearTarget.isHitByY(arrowY)) {
             points = nearTarget.getPoints();
@@ -196,25 +182,52 @@ public class GameServer {
         }
     }
 
-    /** Удаляет клиента при разрыве соединения. */
+
+    public synchronized void onLeaderboardRequest(ClientHandler requester) {
+        // Поставить игру на паузу если идёт
+        if (gameRunning) {
+            gamePaused  = true;
+            gameRunning = false;
+            nearTarget.setSpeed(0);
+            farTarget.setSpeed(0);
+            // Сбросить готовность у всех, кроме запросившего (он уже "смотрит")
+            clients.forEach(c -> c.setReady(false));
+            broadcast(GameProtocol.PAUSE);
+            System.out.println("[Server] Пауза — игрок " + requester.getUsername()
+                    + " запросил таблицу лидеров");
+        }
+
+        // Собрать таблицу из БД
+        List<PlayerRecord> records = playerDao.getLeaderboard();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < records.size(); i++) {
+            if (i > 0) sb.append("|");
+            sb.append(records.get(i).getUsername())
+              .append(",")
+              .append(records.get(i).getWins());
+        }
+
+        requester.send(GameProtocol.encode(GameProtocol.LEADERBOARD, sb.toString()));
+        System.out.println("[Server] Таблица лидеров отправлена: " + requester.getUsername());
+    }
+
     public void removeClient(ClientHandler handler) {
         clients.remove(handler);
         System.out.println("[Server] Отключился: " + handler.getUsername());
+        for (int i = 0; i < clients.size(); i++) {
+            clients.get(i).setPlayerIndex(i);
+        }
         broadcastPlayerList();
     }
 
-    // ── Внутренние методы ─────────────────────────────────────────────────────
-
     private void startGame() {
-        // Сбросить очки и статусы
         clients.forEach(ClientHandler::resetStats);
 
-        // Создать/пересоздать мишени
         if (nearTarget != null) nearTarget.stopMovement();
         if (farTarget  != null) farTarget.stopMovement();
 
-        nearTarget = new Target(NEAR_X, 100, NEAR_SIZE, NEAR_SPEED, false);
-        farTarget  = new Target(FAR_X,  100, FAR_SIZE,  FAR_SPEED,  true);
+        nearTarget = new Target(NEAR_X, -50, NEAR_SIZE, NEAR_SPEED, false);
+        farTarget  = new Target(FAR_X, -100, FAR_SIZE,  FAR_SPEED,  true);
 
         nearTarget.start();
         farTarget.start();
@@ -225,7 +238,6 @@ public class GameServer {
         broadcast(GameProtocol.START);
         System.out.println("[Server] Игра началась!");
 
-        // Поток рассылки состояния (~20 раз в секунду)
         if (stateThread != null) stateThread.interrupt();
         stateThread = new Thread(() -> {
             while (gameRunning || gamePaused) {
@@ -249,39 +261,44 @@ public class GameServer {
         if (nearTarget != null) nearTarget.stopMovement();
         if (farTarget  != null) farTarget.stopMovement();
 
+        // ЛР3: сохранить победу в БД
+        playerDao.incrementWins(winnerName);
+        System.out.println("[Server] Победа сохранена в БД: " + winnerName);
+
         broadcast(GameProtocol.encode(GameProtocol.GAME_OVER, winnerName));
         System.out.println("[Server] Игра завершена. Победитель: " + winnerName);
 
-        // Сбрасываем готовность у всех — можно стартовать заново
         clients.forEach(c -> c.setReady(false));
     }
 
-    /** Y-позиция прицела для каждого игрока (по playerId). */
-    private int getArrowY(int playerId) {
-        // Все игроки на одной высоте — прицел посередине поля
-        // Если хочешь разные высоты для разных игроков — настрой здесь
-        return FIELD_HEIGHT / 2;
+    private int getArrowY(int playerIndex) {
+        return PLAYER_Y_BASE + playerIndex * PLAYER_Y_STEP + PLAYER_SPRITE_H / 2;
     }
 
     // ── Рассылки ──────────────────────────────────────────────────────────────
 
-    /** Рассылает текущие позиции мишеней. */
     public void broadcastState() {
         if (nearTarget == null || farTarget == null) return;
         String msg = GameProtocol.encode(
                 GameProtocol.STATE,
                 String.valueOf(nearTarget.getyPos()),
-                String.valueOf(farTarget.getyPos())
+                String.valueOf(farTarget.getyPos()),
+                nearTarget.isExploding() ? "1" : "0",
+                farTarget.isExploding()  ? "1" : "0"
         );
         broadcast(msg);
     }
 
-    /** Рассылает список всех игроков (имя, очки, выстрелы). */
+    //добавлено поле int wins и оно сохраняется в БД через Hibernate. При рассылке PLAYER_LIST сервер подгружает wins из БД
     public void broadcastPlayerList() {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < clients.size(); i++) {
             if (i > 0) sb.append("|");
-            sb.append(clients.get(i).getInfo().serialize());
+            ClientHandler c = clients.get(i);
+            // Подгрузить wins из БД
+            PlayerRecord rec = playerDao.getOrCreate(c.getUsername());
+            c.getInfo().setWins(rec.getWins());
+            sb.append(c.getInfo().serialize());
         }
         broadcast(GameProtocol.encode(GameProtocol.PLAYER_LIST, sb.toString()));
     }

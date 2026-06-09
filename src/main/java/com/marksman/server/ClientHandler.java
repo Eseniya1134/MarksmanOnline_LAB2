@@ -8,6 +8,8 @@ import java.net.Socket;
 
 /**
  * Поток, обслуживающий одного подключённого игрока на стороне сервера.
+ *
+ * добавлена обработка команды LEADERBOARD_REQUEST.
  */
 public class ClientHandler extends Thread {
 
@@ -16,16 +18,14 @@ public class ClientHandler extends Thread {
     private PrintWriter out;
 
     private final PlayerInfo info;
-    private final int playerId;
+    private volatile int playerIndex;
     private volatile boolean ready = false;
 
-    private static int idCounter = 0;
-
-    public ClientHandler(Socket socket, GameServer server, String username) {
-        this.socket   = socket;
-        this.server   = server;
-        this.playerId = ++idCounter;
-        this.info     = new PlayerInfo(username);
+    public ClientHandler(Socket socket, GameServer server, String username, int playerIndex) {
+        this.socket      = socket;
+        this.server      = server;
+        this.playerIndex = playerIndex;
+        this.info        = new PlayerInfo(username);
         setDaemon(true);
         setName("client-" + username);
     }
@@ -35,9 +35,8 @@ public class ClientHandler extends Thread {
         try (var in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
             out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
 
-            // Сообщить игроку его ID
-            send(GameProtocol.encode(GameProtocol.JOIN_OK, String.valueOf(playerId)));
-            // Разослать всем обновлённый список игроков
+            // Сообщить игроку его индекс
+            send(GameProtocol.encode(GameProtocol.JOIN_OK, String.valueOf(playerIndex)));
             server.broadcastPlayerList();
 
             String line;
@@ -57,9 +56,11 @@ public class ClientHandler extends Thread {
         String cmd = parts[0];
 
         switch (cmd) {
-            case GameProtocol.READY -> server.onPlayerReady(this);
-            case GameProtocol.PAUSE -> server.onPlayerPause(this);
-            case GameProtocol.SHOOT -> server.onShoot(this);
+            case GameProtocol.READY               -> server.onPlayerReady(this);
+            case GameProtocol.PAUSE               -> server.onPlayerPause(this);
+            case GameProtocol.SHOOT               -> server.onShoot(this);
+            // запрос таблицы лидеров через то же соединение
+            case GameProtocol.LEADERBOARD_REQUEST -> server.onLeaderboardRequest(this);
             default -> System.out.println("[Server] Неизвестная команда от "
                     + info.getName() + ": " + message);
         }
@@ -78,12 +79,13 @@ public class ClientHandler extends Thread {
 
     // ── Геттеры / Сеттеры ────────────────────────────────────────────────────
 
-    public PlayerInfo getInfo()          { return info; }
-    public String     getUsername()      { return info.getName(); }
-    public int        getPlayerId()      { return playerId; }
-    public int        getScore()         { return info.getScore(); }
-    public void       addScore(int pts)  { info.addScore(pts); }
-    public void       addShot()          { info.addShot(); }
-    public boolean    isReady()          { return ready; }
-    public void       setReady(boolean r){ ready = r; }
+    public PlayerInfo getInfo()             { return info; }
+    public String     getUsername()         { return info.getName(); }
+    public int        getPlayerIndex()      { return playerIndex; }
+    public void       setPlayerIndex(int i) { this.playerIndex = i; }
+    public int        getScore()            { return info.getScore(); }
+    public void       addScore(int pts)     { info.addScore(pts); }
+    public void       addShot()             { info.addShot(); }
+    public boolean    isReady()             { return ready; }
+    public void       setReady(boolean r)   { ready = r; }
 }

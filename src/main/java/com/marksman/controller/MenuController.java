@@ -15,7 +15,7 @@ import java.net.URL;
 import java.util.ResourceBundle;
 
 /**
- * Контроллер главного меню (menuView.fxml).
+ * Контроллер главного меню
  *
  * Для ЛР2 меню содержит:
  *  – поле «Имя игрока»
@@ -63,7 +63,6 @@ public class MenuController implements Initializable {
             GameViewController gameVC = loader.getController();
             gameVC.setup(username, host, 8080);
 
-            // Переключаем сцену
             Stage stage = (Stage) connectBtn.getScene().getWindow();
             stage.setScene(new Scene(root));
             stage.show();

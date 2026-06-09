@@ -10,28 +10,32 @@ package com.marksman.network;
  *   READY
  *   PAUSE
  *   SHOOT
+ *   LEADERBOARD_REQUEST          (ЛР3: запрос таблицы лидеров)
  *
  * Сервер → Клиент:
  *   JOIN_OK:<playerId>
  *   JOIN_FAIL:<причина>
- *   PLAYER_LIST:<name1>,<score1>,<shots1>|<name2>,...
+ *   PLAYER_LIST:<name1>,<score1>,<shots1>,<wins1>|<name2>,...
  *   START
  *   PAUSE
  *   RESUME
- *   STATE:<nearY>:<farY>
+ *   STATE:<nearY>:<farY>:<nearExplode>:<farExplode>
  *   SHOT:<shooterName>:<arrowY>
  *   HIT:<shooterName>:<points>
  *   GAME_OVER:<winnerName>
+ *   LEADERBOARD:<name1>,<wins1>|<name2>,<wins2>|...   (ЛР3)
  */
 public final class GameProtocol {
 
     private GameProtocol() {}
 
     // ── Клиент → Сервер ─────────────────────────────────────────────────────
-    public static final String JOIN  = "JOIN";
-    public static final String READY = "READY";
-    public static final String PAUSE = "PAUSE";
-    public static final String SHOOT = "SHOOT";
+    public static final String JOIN                 = "JOIN";
+    public static final String READY                = "READY";
+    public static final String PAUSE                = "PAUSE";
+    public static final String SHOOT                = "SHOOT";
+    /** ЛР3: клиент запрашивает таблицу лидеров через то же соединение. */
+    public static final String LEADERBOARD_REQUEST  = "LEADERBOARD_REQUEST";
 
     // ── Сервер → Клиент ─────────────────────────────────────────────────────
     public static final String JOIN_OK      = "JOIN_OK";
@@ -44,6 +48,8 @@ public final class GameProtocol {
     public static final String SHOT_EVENT   = "SHOT";
     public static final String HIT          = "HIT";
     public static final String GAME_OVER    = "GAME_OVER";
+    /** ЛР3: сервер отправляет таблицу лидеров. Формат: name,wins|name,wins|... */
+    public static final String LEADERBOARD  = "LEADERBOARD";
 
     // ── Утилиты ─────────────────────────────────────────────────────────────
 
@@ -55,7 +61,7 @@ public final class GameProtocol {
 
     /**
      * Разбивает сообщение на [команда, остаток].
-     * "STATE:120:340" → ["STATE", "120:340"]
+     * "STATE:120:340:0:0" → ["STATE", "120:340:0:0"]
      */
     public static String[] split(String message) {
         return message.split(":", 2);

@@ -1,10 +1,14 @@
 package com.marksman.entity;
 
 /**
- * Мишень — движется вертикально в отдельном потоке.
+ * Мишень — движется вертикально сверху вниз в отдельном потоке.
  *
- * Ближняя (isFar=false): size=120, speed=2, points=1
- * Дальняя  (isFar=true):  size=60,  speed=4, points=2
+ * По ТЗ: «Мишени движутся по направляющим сверху вниз».
+ * При выходе за нижнюю границу поля мишень телепортируется наверх.
+ *
+ * ИСПРАВЛЕНО: убран bounce (отражение от стен) — теперь только сверху вниз.
+ * Ближняя мишень: size=120, speed=2, points=1
+ * Дальняя  мишень: size=60,  speed=4, points=2  (скорость в 2 раза выше, размер в 2 раза меньше)
  */
 public class Target extends Thread {
 
@@ -17,11 +21,9 @@ public class Target extends Thread {
     private final int points;
 
     private final int fieldHeight;
-    private final int fieldWidth;
 
-    private volatile boolean running = false;
+    private volatile boolean running   = false;
     private volatile boolean exploding = false;
-    private volatile long explodeTime = 0;
     private static final int EXPLODE_DURATION_MS = 600;
 
     // Позиция взрыва (для анимации)
@@ -36,7 +38,6 @@ public class Target extends Thread {
         this.isFar       = isFar;
         this.points      = isFar ? 2 : 1;
         this.fieldHeight = 500;
-        this.fieldWidth  = 900;
         setDaemon(true);
     }
 
@@ -61,16 +62,21 @@ public class Target extends Thread {
         interrupt();
     }
 
+    /**
+     * Движение сверху вниз. При выходе за нижнюю границу — телепортация наверх.
+     * ТЗ: «движутся по направляющим сверху вниз».
+     */
     private void verticalMovement() {
+        if (speed == 0) return; // пауза
         yPos += speed;
-        if (yPos <= 0 || yPos >= fieldHeight - size) {
-            speed = -speed;
+        // Когда мишень вышла за нижнюю границу — появляется сверху
+        if (yPos > fieldHeight) {
+            yPos = -size; // появляется чуть выше верхней границы
         }
     }
 
     /**
-     * Проверка попадания стрелы в мишень.
-     * Используется сервером.
+     * Проверка попадания стрелы в мишень (по объекту Arrow).
      */
     public boolean isHit(Arrow arrow) {
         if (exploding) return false;
@@ -81,7 +87,7 @@ public class Target extends Thread {
     }
 
     /**
-     * Проверка попадания по Y-координате (для серверной логики без объекта Arrow).
+     * Проверка попадания по Y-координате (серверная логика без объекта Arrow).
      * arrowY — вертикальная позиция стрелы, летящей горизонтально.
      */
     public boolean isHitByY(int arrowY) {
@@ -89,12 +95,13 @@ public class Target extends Thread {
         return arrowY >= yPos && arrowY <= yPos + size;
     }
 
-    /** Запускает анимацию взрыва и через EXPLODE_DURATION_MS телепортирует мишень в начало. */
+    /**
+     * Запускает анимацию взрыва и через EXPLODE_DURATION_MS телепортирует мишень наверх.
+     */
     public synchronized void triggerExplosion() {
-        xPosBoom   = xPos;
-        yPosBoom   = yPos;
-        exploding  = true;
-        explodeTime = System.currentTimeMillis();
+        xPosBoom    = xPos;
+        yPosBoom    = yPos;
+        exploding   = true;
 
         new Thread(() -> {
             try {
@@ -104,25 +111,27 @@ public class Target extends Thread {
         }, "target-respawn").start();
     }
 
-    /** Сбрасывает мишень на случайную начальную позицию. */
+    /**
+     * Сбрасывает мишень на случайную позицию в верхней части поля.
+     */
     public synchronized void respawn() {
-        yPos      = (int)(Math.random() * (fieldHeight / 2));
+        yPos      = -(int)(Math.random() * 200 + 50); // появляется чуть выше экрана
         exploding = false;
     }
 
     // ── Геттеры / Сеттеры ────────────────────────────────────────────────────
 
-    public int  getxPos()       { return xPos; }
-    public int  getyPos()       { return yPos; }
-    public int  getSize()       { return size; }
-    public int  getSpeed()      { return speed; }
-    public boolean isFar()      { return isFar; }
-    public int  getPoints()     { return points; }
-    public boolean isExploding(){ return exploding; }
-    public int  getxPosBoom()   { return xPosBoom; }
-    public int  getyPosBoom()   { return yPosBoom; }
+    public int     getxPos()        { return xPos; }
+    public int     getyPos()        { return yPos; }
+    public int     getSize()        { return size; }
+    public int     getSpeed()       { return speed; }
+    public boolean isFar()          { return isFar; }
+    public int     getPoints()      { return points; }
+    public boolean isExploding()    { return exploding; }
+    public int     getxPosBoom()    { return xPosBoom; }
+    public int     getyPosBoom()    { return yPosBoom; }
 
-    public void setxPos(int x)  { this.xPos = x; }
-    public void setyPos(int y)  { this.yPos = y; }
-    public void setSpeed(int s) { this.speed = s; }
+    public void setxPos(int x)      { this.xPos = x; }
+    public void setyPos(int y)      { this.yPos = y; }
+    public void setSpeed(int s)     { this.speed = s; }
 }

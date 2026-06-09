@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC
+        "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+        "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
+<!--
+    Конфигурация Hibernate для игры «Меткий стрелок» ЛР3.
+    Использует SQLite — файл marksman.db в рабочей директории.
+    Для продакшена замените на PostgreSQL/MySQL, изменив
+    connection.url, dialect и driver_class.
+-->
+<hibernate-configuration>
+    <session-factory>
+        <!-- SQLite -->
+        <property name="hibernate.connection.driver_class">org.sqlite.JDBC</property>
+        <property name="hibernate.connection.url">jdbc:sqlite:marksman.db</property>
+        <property name="hibernate.dialect">org.hibernate.community.dialect.SQLiteDialect</property>
+
+        <!-- Пул соединений (минимальный, для учебного проекта) -->
+        <property name="hibernate.connection.pool_size">5</property>
+
+        <!-- Автосоздание/обновление схемы при старте -->
+        <property name="hibernate.hbm2ddl.auto">update</property>
+
+        <!-- Логировать SQL-запросы (для отладки; убрать на проде) -->
+        <property name="hibernate.show_sql">false</property>
+        <property name="hibernate.format_sql">false</property>
+    </session-factory>
+</hibernate-configuration>
